@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { FontAwesome5 } from '@expo/vector-icons'; // FontAwesome5 아이콘 (car-crash)
 
 import { TabBarIcon } from '@/components/navigation/TabBarIcon';
 import { Colors } from '@/constants/Colors';
@@ -17,18 +18,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'CAMERA', // 버튼 그림 아래 텍스트 Home에서 CAMERA로 변경
           tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name={focused ? 'home' : 'home-outline'} color={color} />
+            <TabBarIcon name={focused ? 'camera-reverse' : 'home-outline'} color={color} /> // 그림 home에서 camera-reverse로 변경
           ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          title: 'HISTORY', // code slash에서 car-crash로 변경
           tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name={focused ? 'code-slash' : 'code-slash-outline'} color={color} />
+            <FontAwesome5 name={focused ? 'car-crash' : 'car-crash'} color={color} size={24} />
           ),
         }}
       />
