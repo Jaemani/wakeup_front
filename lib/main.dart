@@ -1,11 +1,17 @@
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+// import 'firebase_options.dart';
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform,
+      demoProjectId: "wakeup-74d89");
   final cameras = await availableCameras();
   runApp(MyApp(cameras: cameras));
 }
@@ -49,7 +55,8 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _initializeCamera(CameraDescription camera) {
-    _controller = CameraController(camera, ResolutionPreset.medium);
+    _controller =
+        CameraController(camera, ResolutionPreset.medium, enableAudio: false);
     _initializeControllerFuture = _controller.initialize();
   }
 
