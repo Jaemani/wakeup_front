@@ -31,6 +31,10 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  pod 'FirebaseFirestore',
+    :git => 'https://github.com/invertase/firestore-ios-sdk-frameworks.git',
+    :tag => '11.2.0' # Replace with the version of the Firebase iOS SDK specified in firebase_core's
+  
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
