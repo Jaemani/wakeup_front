@@ -1,0 +1,15 @@
+{
+  "functions": [
+    {
+      "source": "gcp-function",
+      "codebase": "gcp",
+      "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}
