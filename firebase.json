@@ -1,15 +1,1 @@
-{
-  "functions": [
-    {
-      "source": "gcp-function",
-      "codebase": "gcp",
-      "ignore": [
-        "venv",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ]
-    }
-  ]
-}
+{"flutter":{"platforms":{"android":{"default":{"projectId":"wakeup-74d89","appId":"1:1037534072794:android:c98a71c68122ce2a44bae3","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"wakeup-74d89","appId":"1:1037534072794:ios:cc3ebe72f5fe9e0444bae3","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"wakeup-74d89","appId":"1:1037534072794:ios:cc3ebe72f5fe9e0444bae3","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"wakeup-74d89","configurations":{"android":"1:1037534072794:android:c98a71c68122ce2a44bae3","ios":"1:1037534072794:ios:cc3ebe72f5fe9e0444bae3","macos":"1:1037534072794:ios:cc3ebe72f5fe9e0444bae3","web":"1:1037534072794:web:18de8432fab65b9f44bae3","windows":"1:1037534072794:web:3d732bcb2492ca8a44bae3"}}}}}}
