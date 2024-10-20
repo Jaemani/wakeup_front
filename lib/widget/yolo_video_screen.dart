@@ -155,13 +155,23 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       bool eyesClosed = result.any((detection) => detection['tag'] == 'closed');
       bool eyesOpened = result.any((detection) => detection['tag'] == 'opened');
 
+      if (result == []) {
+        eyesClosed = false;
+        eyesOpened = false;
+      }
+
       _updateEyeState(eyesClosed, eyesOpened);
 
-      setState(() {
-        yoloResults = result;
-      });
+      if (result.isNotEmpty) {
+        setState(() {
+          yoloResults = result;
+        });
+      }
 
       print(debugInfo);
+      print(result.any((detection) => detection['tag'] == 'close'));
+      print(result.any((detection) => detection['tag'] == 'opened'));
+      print(result);
     } catch (e) {
       print('Error in yoloOnFrame: $e');
     }
@@ -169,15 +179,17 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
   void _updateEyeState(bool closed, bool opened) {
     if (closed && eyesClosedStartTime == null) {
+      // Start counting when eyes are first detected as closed
       eyesClosedStartTime = DateTime.now();
+      debugInfo = 'Eyes just closed';
     } else if (opened && eyesClosedStartTime != null) {
+      // Stop counting when eyes are no longer closed (either opened or not detected)
       final closedDuration = DateTime.now().difference(eyesClosedStartTime!);
       debugInfo = 'Eyes were closed for: ${closedDuration.inMilliseconds} ms';
       eyesClosedStartTime = null;
       isWarning = false;
-    }
-
-    if (eyesClosedStartTime != null) {
+    } else if (eyesClosedStartTime != null) {
+      // Continue counting if eyes are still closed
       final currentClosedDuration =
           DateTime.now().difference(eyesClosedStartTime!);
       debugInfo = 'Eyes closed for: ${currentClosedDuration.inMilliseconds} ms';
@@ -415,6 +427,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
   }
 
   Future<void> switchCamera(int cameraIndex) async {
+    stopDetection();
     await controller.dispose();
     controller = CameraController(
       widget.cameras[cameraIndex],
