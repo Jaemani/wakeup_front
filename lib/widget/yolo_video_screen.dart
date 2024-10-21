@@ -260,12 +260,14 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                     Text(
                       'FPS: ${fps.toStringAsFixed(1)}',
                       style: const TextStyle(
-                          color: Color.fromARGB(255, 197, 215, 29),
+                          color: Color.fromARGB(255, 203, 188, 20),
                           fontSize: 16),
                     ),
                     Text(
                       'Detection Time: ${detectionTime.toStringAsFixed(0)} ms',
-                      style: const TextStyle(color: Colors.blue, fontSize: 16),
+                      style: const TextStyle(
+                          color: Color.fromARGB(255, 25, 118, 195),
+                          fontSize: 16),
                     ),
                   ],
                 ),
@@ -284,6 +286,18 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                   ],
                 ),
               ),
+            // Drowsiness warning message
+            if (isWarning)
+              const Center(
+                child: Text(
+                  'WAKE UP!!!',
+                  style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 38,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+
             // Log window on top of all other elements
             AnimatedBuilder(
               animation: _slideController,
@@ -340,18 +354,6 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                 ],
               ),
             ),
-
-            // Drowsiness warning message
-            if (isWarning)
-              const Center(
-                child: Text(
-                  'WAKE UP!!!',
-                  style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
           ],
         ),
       ),
