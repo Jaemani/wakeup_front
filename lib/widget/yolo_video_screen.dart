@@ -31,7 +31,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
   DateTime? eyesClosedStartTime;
   bool isWarning = false;
-  String debugInfo = '';
+  String debugInfo = 'No eyes are detected.';
   int frameCount = 0;
   double fps = 0;
   double detectionTime = 0;
@@ -297,30 +297,6 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                       fontWeight: FontWeight.bold),
                 ),
               ),
-
-            // Log window on top of all other elements
-            AnimatedBuilder(
-              animation: _slideController,
-              builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(
-                      MediaQuery.of(context).size.width *
-                          (1 - _slideController.value),
-                      0),
-                  child: Opacity(
-                    opacity: _slideController.value,
-                    child: child,
-                  ),
-                );
-              },
-              child: LogWindow(
-                key: _logWindowKey,
-                onApiKeySubmitted: (apiKey) {
-                  print('API Key submitted: $apiKey');
-                },
-              ),
-            ),
-
             // Controls for starting detection, flipping camera, and toggling info visibility
             Positioned(
               bottom: 75,
@@ -352,6 +328,28 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                     ),
                   ),
                 ],
+              ),
+            ),
+            // Log window on top of all other elements
+            AnimatedBuilder(
+              animation: _slideController,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(
+                      MediaQuery.of(context).size.width *
+                          (1 - _slideController.value),
+                      0),
+                  child: Opacity(
+                    opacity: _slideController.value,
+                    child: child,
+                  ),
+                );
+              },
+              child: LogWindow(
+                key: _logWindowKey,
+                onApiKeySubmitted: (apiKey) {
+                  print('API Key submitted: $apiKey');
+                },
               ),
             ),
           ],
@@ -438,6 +436,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
   Future<void> startDetection() async {
     setState(() {
+      debugInfo = 'No eyes are detected.';
       isDetecting = true;
     });
     if (controller.value.isStreamingImages) return;
@@ -452,8 +451,9 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
   Future<void> stopDetection() async {
     setState(() {
-      isDetecting = false;
+      debugInfo = 'No eyes are detected.';
       yoloResults.clear();
+      isDetecting = false;
     });
   }
 
