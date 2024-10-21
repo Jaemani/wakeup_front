@@ -160,13 +160,15 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       debugInfo = 'Eyes just closed';
     } else if (opened && eyesClosedStartTime != null) {
       final closedDuration = DateTime.now().difference(eyesClosedStartTime!);
-      debugInfo = 'Eyes were closed for: ${closedDuration.inMilliseconds} ms';
+      debugInfo =
+          'Eyes were closed for: ${closedDuration.inMilliseconds / 1000} s';
       eyesClosedStartTime = null;
       isWarning = false;
     } else if (eyesClosedStartTime != null) {
       final currentClosedDuration =
           DateTime.now().difference(eyesClosedStartTime!);
-      debugInfo = 'Eyes closed for: ${currentClosedDuration.inMilliseconds} ms';
+      debugInfo =
+          'Eyes closed for: ${currentClosedDuration.inMilliseconds / 1000} s';
 
       if (currentClosedDuration.inMilliseconds >= 1200 && !isWarning) {
         _logWarning(currentClosedDuration);
@@ -178,7 +180,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
   void _logWarning(Duration closedDuration) {
     final warningMessage =
-        'WARNING: Eyes closed for ${closedDuration.inMilliseconds} ms';
+        'WARNING: Eyes closed for ${closedDuration.inMilliseconds / 1000} s';
     print(warningMessage);
     _logWindowKey.currentState?.addLog(warningMessage);
   }
@@ -226,7 +228,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
         child: Stack(
           children: [
             buildMainPage(),
-
+            ...displayBoxesAroundRecognizedObjects(MediaQuery.of(context).size),
             // Safety messages on top of the screen
             Positioned(
               top: 40,
@@ -234,8 +236,8 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
               child: Text(
                 safetyStatus,
                 style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
                   color: safetyStatus == "Safe"
                       ? Colors.green
                       : Colors.red, // Green for Safe, Red for Danger
@@ -246,29 +248,42 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
             // Eye-closed status, FPS, and detection time (can be toggled)
             if (showInfo)
               Positioned(
-                top: 70,
+                top: 82.5,
                 left: 20,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       debugInfo,
-                      style: const TextStyle(color: Colors.red, fontSize: 18),
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
                     ),
                     Text(
                       'FPS: ${fps.toStringAsFixed(1)}',
                       style: const TextStyle(
                           color: Color.fromARGB(255, 197, 215, 29),
-                          fontSize: 18),
+                          fontSize: 16),
                     ),
                     Text(
                       'Detection Time: ${detectionTime.toStringAsFixed(0)} ms',
-                      style: const TextStyle(color: Colors.blue, fontSize: 18),
+                      style: const TextStyle(color: Colors.blue, fontSize: 16),
                     ),
                   ],
                 ),
               ),
-
+            if (!showInfo)
+              Positioned(
+                top: 82.5,
+                left: 20,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      debugInfo,
+                      style: const TextStyle(color: Colors.red, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
             // Log window on top of all other elements
             AnimatedBuilder(
               animation: _slideController,
@@ -337,8 +352,6 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                       fontWeight: FontWeight.bold),
                 ),
               ),
-
-            ...displayBoxesAroundRecognizedObjects(MediaQuery.of(context).size),
           ],
         ),
       ),
