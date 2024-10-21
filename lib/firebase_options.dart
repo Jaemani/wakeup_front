@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'wakeup-74d89.appspot.com',
     measurementId: 'G-YLM1YT75GK',
   );
+
 }

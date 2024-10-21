@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wakeup/services/auth_service.dart';
 
 class LogWindow extends StatefulWidget {
   final Function(String) onApiKeySubmitted;
@@ -11,17 +12,32 @@ class LogWindow extends StatefulWidget {
 }
 
 class LogWindowState extends State<LogWindow> {
-  final TextEditingController _apiKeyController = TextEditingController();
-  bool _isApiKeySubmitted = false;
+  final AuthService _authService = AuthService(); // AuthService for Firebase
   final List<String> _logs = [];
+  final TextEditingController _apiKeyController =
+      TextEditingController(); // Controller for the input field
 
-  void _submitApiKey() {
-    final apiKey = _apiKeyController.text.trim();
+  @override
+  void initState() {
+    super.initState();
+    _loadApiKey();
+  }
+
+  Future<void> _loadApiKey() async {
+    final apiKey = await _authService.getStoredApiKey();
+    if (apiKey != null) {
+      widget.onApiKeySubmitted(apiKey);
+    }
+  }
+
+  Future<void> _submitApiKey() async {
+    final apiKey = _apiKeyController.text;
     if (apiKey.isNotEmpty) {
       widget.onApiKeySubmitted(apiKey);
-      setState(() {
-        _isApiKeySubmitted = true;
-      });
+      await _authService.storeApiKey(apiKey); // Store API key in Firebase
+      addLog("API key submitted and stored.");
+    } else {
+      addLog("API key cannot be empty.");
     }
   }
 
@@ -33,63 +49,65 @@ class LogWindowState extends State<LogWindow> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          AppBar(
-            title: const Text('Caution Logs'),
-            backgroundColor: Colors.blue,
-          ),
-          Expanded(
-            child: _isApiKeySubmitted ? _buildLogList() : _buildApiKeyInput(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildApiKeyInput() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          TextField(
-            controller: _apiKeyController,
-            decoration: const InputDecoration(
-              labelText: 'Enter Gemini API',
-              border: OutlineInputBorder(),
+    return Scaffold(
+      body: Container(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height, // Full screen
+        color: Colors.grey[850], // Solid gray background theme
+        child: Column(
+          children: [
+            AppBar(
+              title: const Text(
+                'Log Window',
+                style: TextStyle(
+                  color: Color.fromARGB(255, 209, 209, 209),
+                ),
+              ),
+              backgroundColor: Colors.grey[900], // Darker gray app bar
             ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _submitApiKey,
-            child: const Text('Submit'),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _apiKeyController,
+                style: const TextStyle(
+                  color: Colors.white, // White text when typing
+                ),
+                cursorColor: Colors.white, // White cursor
+                decoration: const InputDecoration(
+                  labelText: 'Enter API Key',
+                  labelStyle:
+                      TextStyle(color: Colors.white70), // White label text
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _submitApiKey,
+              child: const Text('Submit API Key'),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _logs.length,
+                itemBuilder: (context, index) {
+                  return Card(
+                    color: Colors.grey[700], // Gray card background
+                    margin:
+                        const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(
+                        _logs[index],
+                        style:
+                            const TextStyle(color: Colors.white), // White text
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  Widget _buildLogList() {
-    return ListView.builder(
-      itemCount: _logs.length,
-      itemBuilder: (context, index) {
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Text(_logs[index]),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _apiKeyController.dispose();
-    super.dispose();
   }
 }

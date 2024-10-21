@@ -26,6 +26,25 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:1037534072794:android:c6fb1702bf53957b44bae3",
+        "android_client_info": {
+          "package_name": "com.nipagoogle.wakeup"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOgDAs8oKPboGX1L7ZXn0JwaeB9RuecaU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:1037534072794:android:c98a71c68122ce2a44bae3",
         "android_client_info": {
           "package_name": "com.wakeup.app"

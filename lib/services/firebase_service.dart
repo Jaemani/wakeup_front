@@ -1,37 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
 
 class FirebaseService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  static Future<void> logWarning(
-      String userId, double duration, GeoPoint location) async {
-    await _firestore.collection('warnLogs').add({
-      'userId': userId,
-      'timestamp': FieldValue.serverTimestamp(),
-      'duration': duration,
-      'location': location,
-    });
-  }
-
-  static Future<List<GeoPoint>> getDangerousLocations() async {
-    final dangerousLocations =
-        await _firestore.collection('dangerousLocations').get();
-    return dangerousLocations.docs
-        .map((doc) => doc['location'] as GeoPoint)
-        .toList();
-  }
-
+  // Method to check if the user's current location is near a dangerous location
   static Future<bool> isNearDangerousLocation(GeoPoint currentLocation) async {
-    final dangerousLocations = await getDangerousLocations();
-    for (var location in dangerousLocations) {
-      double distance = Geolocator.distanceBetween(currentLocation.latitude,
-          currentLocation.longitude, location.latitude, location.longitude);
-      if (distance < 100) {
-        // Within 100 meters
-        return true;
+    try {
+      // Get all dangerous locations from Firestore
+      QuerySnapshot snapshot =
+          await _firestore.collection('DangerousLocations').get();
+
+      // Loop through each document and check the distance
+      for (var doc in snapshot.docs) {
+        GeoPoint dangerousLocation = doc['location'] as GeoPoint;
+
+        // You can set a radius to define "near" (e.g., 0.001 degree ≈ 100 meters)
+        const double dangerRadius = 0.001;
+
+        // Calculate the difference in latitudes and longitudes
+        double latDiff =
+            (currentLocation.latitude - dangerousLocation.latitude).abs();
+        double lonDiff =
+            (currentLocation.longitude - dangerousLocation.longitude).abs();
+
+        // Check if the current location is within the danger radius
+        if (latDiff <= dangerRadius && lonDiff <= dangerRadius) {
+          return true; // Dangerous location found
+        }
       }
+
+      // No dangerous location found nearby
+      return false;
+    } catch (e) {
+      print('Error checking dangerous locations: $e');
+      return false;
     }
-    return false;
   }
 }

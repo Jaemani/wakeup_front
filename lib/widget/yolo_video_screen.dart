@@ -78,15 +78,11 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       controller = CameraController(widget.cameras[0], ResolutionPreset.high);
       await controller.initialize();
       await loadYoloModel();
-      await switchCamera(0);
       setState(() {
         isLoaded = true;
-        isDetecting = false;
-        yoloResults = [];
       });
     } catch (e) {
       print('Error in init: $e');
-      // Handle initialization error (e.g., show error message to user)
     }
   }
 
@@ -96,22 +92,6 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       await _audioPlayer.setReleaseMode(ReleaseMode.stop);
     } catch (e) {
       print('Error initializing audio player: $e');
-    }
-  }
-
-  Future<void> _updateCurrentLocation() async {
-    try {
-      currentPosition = await LocationService.getCurrentLocation();
-      if (currentPosition != null) {
-        bool isDangerous = await FirebaseService.isNearDangerousLocation(
-            GeoPoint(currentPosition!.latitude, currentPosition!.longitude));
-        if (isDangerous) {
-          _logWindowKey.currentState
-              ?.addLog('Warning: You are near a dangerous location!');
-        }
-      }
-    } catch (e) {
-      print('Error updating location: $e');
     }
   }
 
@@ -130,37 +110,24 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       });
     } catch (e) {
       print('Error loading YOLO model: $e');
-      // Handle model loading error
     }
   }
 
   Future<void> yoloOnFrame(CameraImage cameraImage) async {
     try {
-      final startTime = DateTime.now();
-
       final result = await vision.yoloOnFrame(
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        iouThreshold: 0.4,
         confThreshold: confidenceThreshold,
+        iouThreshold: 0.4,
         classThreshold: 0.5,
       );
-
-      final endTime = DateTime.now();
-      detectionTime = endTime.difference(startTime).inMilliseconds.toDouble();
 
       frameCount++;
 
       bool eyesClosed = result.any((detection) => detection['tag'] == 'closed');
       bool eyesOpened = result.any((detection) => detection['tag'] == 'opened');
-
-      if (result == []) {
-        eyesClosed = false;
-        eyesOpened = false;
-      }
-
-      _updateEyeState(eyesClosed, eyesOpened);
 
       if (result.isNotEmpty) {
         setState(() {
@@ -168,10 +135,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
         });
       }
 
-      print(debugInfo);
-      print(result.any((detection) => detection['tag'] == 'close'));
-      print(result.any((detection) => detection['tag'] == 'opened'));
-      print(result);
+      _updateEyeState(eyesClosed, eyesOpened);
     } catch (e) {
       print('Error in yoloOnFrame: $e');
     }
@@ -179,17 +143,14 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
   void _updateEyeState(bool closed, bool opened) {
     if (closed && eyesClosedStartTime == null) {
-      // Start counting when eyes are first detected as closed
       eyesClosedStartTime = DateTime.now();
       debugInfo = 'Eyes just closed';
     } else if (opened && eyesClosedStartTime != null) {
-      // Stop counting when eyes are no longer closed (either opened or not detected)
       final closedDuration = DateTime.now().difference(eyesClosedStartTime!);
       debugInfo = 'Eyes were closed for: ${closedDuration.inMilliseconds} ms';
       eyesClosedStartTime = null;
       isWarning = false;
     } else if (eyesClosedStartTime != null) {
-      // Continue counting if eyes are still closed
       final currentClosedDuration =
           DateTime.now().difference(eyesClosedStartTime!);
       debugInfo = 'Eyes closed for: ${currentClosedDuration.inMilliseconds} ms';
@@ -270,6 +231,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
         child: Stack(
           children: [
             buildMainPage(),
+            // Log window (covers full screen)
             AnimatedBuilder(
               animation: _slideController,
               builder: (context, child) {
@@ -370,39 +332,53 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
 
     Color colorPick = const Color.fromARGB(255, 50, 233, 30);
 
-    return yoloResults.map((result) {
-      double left = result["box"][0] * scaleX;
-      final double top = result["box"][1] * scaleY;
-      double right = result["box"][2] * scaleX;
-      final double bottom = result["box"][3] * scaleY;
+    return yoloResults
+        .map((result) {
+          // Safely access box values with null checks
+          List<dynamic>? box = result["box"] as List<dynamic>?;
+          if (box == null || box.length < 5)
+            return Container(); // Skip invalid results
 
-      if (isFrontCamera) {
-        final double tmp = left;
-        left = screen.width - right;
-        right = screen.width - tmp;
-      }
+          double left = (box[0] as num?)?.toDouble() ?? 0;
+          double top = (box[1] as num?)?.toDouble() ?? 0;
+          double right = (box[2] as num?)?.toDouble() ?? 0;
+          double bottom = (box[3] as num?)?.toDouble() ?? 0;
+          double confidence = (box[4] as num?)?.toDouble() ?? 0;
 
-      return Positioned(
-        left: isFrontCamera ? screen.width - right : left,
-        top: top,
-        width: right - left,
-        height: bottom - top,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.all(Radius.circular(10.0)),
-            border: Border.all(color: Colors.pink, width: 2.0),
-          ),
-          child: Text(
-            "${result['tag']} ${(result['box'][4] * 100).toStringAsFixed(1)}%",
-            style: TextStyle(
-              background: Paint()..color = colorPick,
-              color: const Color.fromARGB(255, 115, 0, 255),
-              fontSize: 18.0,
+          left *= scaleX;
+          top *= scaleY;
+          right *= scaleX;
+          bottom *= scaleY;
+
+          if (isFrontCamera) {
+            final double tmp = left;
+            left = screen.width - right;
+            right = screen.width - tmp;
+          }
+
+          return Positioned(
+            left: isFrontCamera ? screen.width - right : left,
+            top: top,
+            width: right - left,
+            height: bottom - top,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.all(Radius.circular(10.0)),
+                border: Border.all(color: Colors.pink, width: 2.0),
+              ),
+              child: Text(
+                "${result['tag'] ?? 'Unknown'} ${(confidence * 100).toStringAsFixed(1)}%",
+                style: TextStyle(
+                  background: Paint()..color = colorPick,
+                  color: const Color.fromARGB(255, 115, 0, 255),
+                  fontSize: 18.0,
+                ),
+              ),
             ),
-          ),
-        ),
-      );
-    }).toList();
+          );
+        })
+        .whereType<Positioned>()
+        .toList();
   }
 
   Future<void> startDetection() async {
