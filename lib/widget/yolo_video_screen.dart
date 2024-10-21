@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:wakeup/services/location_service.dart';
 import 'package:wakeup/services/firebase_service.dart';
@@ -26,23 +25,24 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
   CameraImage? cameraImage;
   bool isLoaded = false;
   bool isDetecting = false;
+  bool showInfo =
+      true; // New: Controls visibility of eye-closed status, FPS, and detection time
   int currentCameraIndex = 0;
-  double confidenceThreshold = 0.5;
-
-  late AnimationController _slideController;
-  bool isLogPageVisible = false;
-  final GlobalKey<LogWindowState> _logWindowKey = GlobalKey<LogWindowState>();
-
-  Position? currentPosition;
-  final AudioPlayer _audioPlayer = AudioPlayer();
 
   DateTime? eyesClosedStartTime;
   bool isWarning = false;
   String debugInfo = '';
-
   int frameCount = 0;
   double fps = 0;
   double detectionTime = 0;
+
+  late AnimationController _slideController;
+  final GlobalKey<LogWindowState> _logWindowKey = GlobalKey<LogWindowState>();
+
+  Position? currentPosition;
+  String safetyStatus = "Safe"; // New: Stores location safety status
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -62,14 +62,13 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       }
     });
 
-    _initAudioPlayer();
-
     Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         fps = frameCount.toDouble();
         frameCount = 0;
       });
     });
+    _initAudioPlayer();
   }
 
   Future<void> init() async {
@@ -78,6 +77,7 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       controller = CameraController(widget.cameras[0], ResolutionPreset.high);
       await controller.initialize();
       await loadYoloModel();
+      _startMonitoringLocation(); // New: Start location monitoring
       setState(() {
         isLoaded = true;
       });
@@ -113,17 +113,30 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
     }
   }
 
+  void _startMonitoringLocation() {
+    LocationService.getLocationStream().listen((Position position) async {
+      bool isNearDanger =
+          await LocationService.isNearDangerousLocation(position);
+      setState(() {
+        safetyStatus = isNearDanger ? "Dangerous Location Nearby!" : "Safe";
+      });
+    });
+  }
+
   Future<void> yoloOnFrame(CameraImage cameraImage) async {
     try {
+      final startTime = DateTime.now();
+
       final result = await vision.yoloOnFrame(
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        confThreshold: confidenceThreshold,
+        confThreshold: 0.5,
         iouThreshold: 0.4,
         classThreshold: 0.5,
       );
-
+      final endTime = DateTime.now();
+      detectionTime = endTime.difference(startTime).inMilliseconds.toDouble();
       frameCount++;
 
       bool eyesClosed = result.any((detection) => detection['tag'] == 'closed');
@@ -170,6 +183,13 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
     _logWindowKey.currentState?.addLog(warningMessage);
   }
 
+  // Toggle the visibility of eye-closed status, FPS, and detection time
+  void _toggleInfoVisibility() {
+    setState(() {
+      showInfo = !showInfo;
+    });
+  }
+
   Widget buildCameraPreview(double deviceRatio) {
     final scale = 1 / (controller.value.aspectRatio * deviceRatio);
     final mirror = widget.cameras[currentCameraIndex].lensDirection ==
@@ -189,31 +209,6 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
     );
   }
 
-  void _handleApiKeySubmitted(String apiKey) {
-    print('API Key submitted: $apiKey');
-    _logWindowKey.currentState?.addLog('API Key submitted successfully');
-  }
-
-  void _onDragUpdate(DragUpdateDetails details) {
-    setState(() {
-      _slideController.value -= details.primaryDelta! / context.size!.width;
-    });
-  }
-
-  void _onDragEnd(DragEndDetails details) {
-    if (_slideController.isAnimating) return;
-    final double flingVelocity =
-        details.velocity.pixelsPerSecond.dx / context.size!.width;
-    if (flingVelocity < 0) {
-      _slideController.fling(velocity: math.max(2.0, -flingVelocity));
-    } else if (flingVelocity > 0) {
-      _slideController.fling(velocity: math.min(-2.0, -flingVelocity));
-    } else {
-      _slideController.fling(
-          velocity: _slideController.value < 0.5 ? -2.0 : 2.0);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!isLoaded) {
@@ -231,7 +226,50 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
         child: Stack(
           children: [
             buildMainPage(),
-            // Log window (covers full screen)
+
+            // Safety messages on top of the screen
+            Positioned(
+              top: 40,
+              left: 20,
+              child: Text(
+                safetyStatus,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: safetyStatus == "Safe"
+                      ? Colors.green
+                      : Colors.red, // Green for Safe, Red for Danger
+                ),
+              ),
+            ),
+
+            // Eye-closed status, FPS, and detection time (can be toggled)
+            if (showInfo)
+              Positioned(
+                top: 70,
+                left: 20,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      debugInfo,
+                      style: const TextStyle(color: Colors.red, fontSize: 18),
+                    ),
+                    Text(
+                      'FPS: ${fps.toStringAsFixed(1)}',
+                      style: const TextStyle(
+                          color: Color.fromARGB(255, 197, 215, 29),
+                          fontSize: 18),
+                    ),
+                    Text(
+                      'Detection Time: ${detectionTime.toStringAsFixed(0)} ms',
+                      style: const TextStyle(color: Colors.blue, fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Log window on top of all other elements
             AnimatedBuilder(
               animation: _slideController,
               builder: (context, child) {
@@ -240,45 +278,66 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
                       MediaQuery.of(context).size.width *
                           (1 - _slideController.value),
                       0),
-                  child: child,
+                  child: Opacity(
+                    opacity: _slideController.value,
+                    child: child,
+                  ),
                 );
               },
               child: LogWindow(
                 key: _logWindowKey,
-                onApiKeySubmitted: _handleApiKeySubmitted,
+                onApiKeySubmitted: (apiKey) {
+                  print('API Key submitted: $apiKey');
+                },
               ),
             ),
+
+            // Controls for starting detection, flipping camera, and toggling info visibility
             Positioned(
-              top: 50,
-              left: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              bottom: 75,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    debugInfo,
-                    style: const TextStyle(color: Colors.red, fontSize: 18),
+                  FloatingActionButton(
+                    onPressed: isDetecting ? stopDetection : startDetection,
+                    child: Icon(
+                      isDetecting
+                          ? Icons.remove_red_eye_outlined
+                          : Icons.visibility_off,
+                      color: isDetecting ? Colors.red : Colors.white,
+                    ),
                   ),
-                  Text(
-                    'FPS: ${fps.toStringAsFixed(1)}',
-                    style: const TextStyle(color: Colors.green, fontSize: 18),
+                  const SizedBox(width: 20),
+                  FloatingActionButton(
+                    onPressed: flipCamera,
+                    child: const Icon(Icons.flip_camera_ios),
                   ),
-                  Text(
-                    'Detection Time: ${detectionTime.toStringAsFixed(1)} ms',
-                    style: const TextStyle(color: Colors.blue, fontSize: 18),
+                  const SizedBox(width: 20),
+                  // Button to toggle the visibility of info
+                  FloatingActionButton(
+                    onPressed: _toggleInfoVisibility,
+                    child: Icon(
+                      showInfo ? Icons.notes_outlined : Icons.remove_outlined,
+                    ),
                   ),
                 ],
               ),
             ),
+
+            // Drowsiness warning message
             if (isWarning)
               const Center(
                 child: Text(
-                  'WAKE UP!',
+                  'WAKE UP!!!',
                   style: TextStyle(
                       color: Colors.red,
-                      fontSize: 36,
+                      fontSize: 40,
                       fontWeight: FontWeight.bold),
                 ),
               ),
+
             ...displayBoxesAroundRecognizedObjects(MediaQuery.of(context).size),
           ],
         ),
@@ -295,28 +354,6 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
       children: [
         buildCameraPreview(deviceRatio),
         ...displayBoxesAroundRecognizedObjects(size),
-        Positioned(
-          bottom: 75,
-          left: 0,
-          right: 0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FloatingActionButton(
-                onPressed: isDetecting ? stopDetection : startDetection,
-                child: Icon(
-                  isDetecting ? Icons.stop : Icons.play_arrow,
-                  color: isDetecting ? Colors.red : Colors.white,
-                ),
-              ),
-              const SizedBox(width: 20),
-              FloatingActionButton(
-                onPressed: flipCamera,
-                child: const Icon(Icons.flip_camera_ios),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -330,55 +367,58 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
         widget.cameras[currentCameraIndex].lensDirection ==
             CameraLensDirection.front;
 
-    Color colorPick = const Color.fromARGB(255, 50, 233, 30);
+    return yoloResults.map((result) {
+      List<dynamic>? box = result["box"] as List<dynamic>?;
+      if (box == null || box.length < 5) return Container();
 
-    return yoloResults
-        .map((result) {
-          // Safely access box values with null checks
-          List<dynamic>? box = result["box"] as List<dynamic>?;
-          if (box == null || box.length < 5)
-            return Container(); // Skip invalid results
+      double left = (box[0] as num?)?.toDouble() ?? 0;
+      double top = (box[1] as num?)?.toDouble() ?? 0;
+      double right = (box[2] as num?)?.toDouble() ?? 0;
+      double bottom = (box[3] as num?)?.toDouble() ?? 0;
+      double confidence = (box[4] as num?)?.toDouble() ?? 0;
 
-          double left = (box[0] as num?)?.toDouble() ?? 0;
-          double top = (box[1] as num?)?.toDouble() ?? 0;
-          double right = (box[2] as num?)?.toDouble() ?? 0;
-          double bottom = (box[3] as num?)?.toDouble() ?? 0;
-          double confidence = (box[4] as num?)?.toDouble() ?? 0;
+      left *= scaleX;
+      top *= scaleY;
+      right *= scaleX;
+      bottom *= scaleY;
 
-          left *= scaleX;
-          top *= scaleY;
-          right *= scaleX;
-          bottom *= scaleY;
+      if (isFrontCamera) {
+        final double tmp = left;
+        left = screen.width - right;
+        right = screen.width - tmp;
+      }
 
-          if (isFrontCamera) {
-            final double tmp = left;
-            left = screen.width - right;
-            right = screen.width - tmp;
-          }
-
-          return Positioned(
-            left: isFrontCamera ? screen.width - right : left,
+      return Stack(
+        children: [
+          // Box remains in its original position
+          Positioned(
+            left: left,
             top: top,
             width: right - left,
             height: bottom - top,
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.all(Radius.circular(10.0)),
-                border: Border.all(color: Colors.pink, width: 2.0),
-              ),
-              child: Text(
-                "${result['tag'] ?? 'Unknown'} ${(confidence * 100).toStringAsFixed(1)}%",
-                style: TextStyle(
-                  background: Paint()..color = colorPick,
-                  color: const Color.fromARGB(255, 115, 0, 255),
-                  fontSize: 18.0,
-                ),
+                border: Border.all(color: Colors.indigoAccent, width: 2.0),
               ),
             ),
-          );
-        })
-        .whereType<Positioned>()
-        .toList();
+          ),
+          // Text appears above the box, positioned independently
+          Positioned(
+            left: left,
+            top: top - 20, // Position text above the box
+            child: Text(
+              "${result['tag'] ?? 'Unknown'} ${(confidence * 100).toStringAsFixed(1)}%",
+              style: const TextStyle(
+                color: Colors.black,
+                backgroundColor: Color.fromARGB(255, 166, 166, 166),
+                fontSize: 14.0,
+              ),
+            ),
+          ),
+        ],
+      );
+    }).toList();
   }
 
   Future<void> startDetection() async {
@@ -402,6 +442,11 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
     });
   }
 
+  void flipCamera() {
+    final nextCameraIndex = (currentCameraIndex + 1) % widget.cameras.length;
+    switchCamera(nextCameraIndex);
+  }
+
   Future<void> switchCamera(int cameraIndex) async {
     stopDetection();
     await controller.dispose();
@@ -416,13 +461,28 @@ class _YoloVideoState extends State<YoloVideo> with TickerProviderStateMixin {
     });
   }
 
-  void flipCamera() {
-    final nextCameraIndex = (currentCameraIndex + 1) % widget.cameras.length;
-    switchCamera(nextCameraIndex);
-  }
-
   Future<void> _playAlertSound() async {
     await _audioPlayer.resume();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    setState(() {
+      _slideController.value -= details.primaryDelta! / context.size!.width;
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (_slideController.isAnimating) return;
+    final double flingVelocity =
+        details.velocity.pixelsPerSecond.dx / context.size!.width;
+    if (flingVelocity < 0) {
+      _slideController.fling(velocity: math.max(2.0, -flingVelocity));
+    } else if (flingVelocity > 0) {
+      _slideController.fling(velocity: math.min(-2.0, -flingVelocity));
+    } else {
+      _slideController.fling(
+          velocity: _slideController.value < 0.5 ? -2.0 : 2.0);
+    }
   }
 
   @override
